@@ -6,7 +6,19 @@ from exif import Image as ExifImage
 import io
 from typing import Optional, Dict, Any
 
+
+
 def get_geo_info(image_data: bytes) -> Optional[Dict[str, Any]]:
+    """
+    Extracts GPS information from an image.
+    
+    Args:
+        image_data: bytes - The image data to extract GPS information from.
+        
+    Returns:	
+        dict - A dictionary containing the GPS information if found, otherwise None.
+    """
+
     try:
         # Create an in-memory file-like object
         image_stream = io.BytesIO(image_data)
@@ -41,10 +53,24 @@ def get_geo_info(image_data: bytes) -> Optional[Dict[str, Any]]:
         print(f"Error extracting EXIF data: {str(e)}")
         return None
 
+
+# Initialize the FastAPI app
 app = FastAPI(title="Postmark Webhook Receiver")
 
+
+# Define the route for the webhook
 @app.post("/webhook")
 async def postmark_webhook(request: Request):
+    """
+    Handles the Postmark webhook.
+    
+    Args:
+        request: Request - The incoming request object.
+        
+    Returns:
+        dict - A dictionary containing the status and message.
+    """
+    
     # Get the raw JSON data from the request
     data = await request.json()
     
@@ -72,8 +98,8 @@ async def postmark_webhook(request: Request):
     # Get the attachments
     attachments = data.get("Attachments", [])
     attachment_list = []
-    
     for attachment in attachments:
+        # Get the attachment info
         attachment_name = attachment.get("Name")
         attachment_content_type = attachment.get("ContentType")
         attachment_content_length = attachment.get("ContentLength")
@@ -87,27 +113,17 @@ async def postmark_webhook(request: Request):
         if attachment_content_type.startswith('image/'):
             geo_info = get_geo_info(decoded_content)
         
+        # Create the attachment info
         attachment_info = {
             "name": attachment_name,
             "content_type": attachment_content_type,
             "content_length": attachment_content_length,
+            "decoded_content": decoded_content,
             "geo_info": geo_info
         }
         
+        # Append the attachment info to the list
         attachment_list.append(attachment_info)
-        
-        # Save the attachment
-        with open(attachment_name, "wb") as f:
-            f.write(decoded_content)
     
-    # Print the received data with geo information
-    print("Received webhook data:")
-    print(json.dumps({
-        "from": {"email": from_email, "name": from_name},
-        "to": {"email": to_email, "name": to_name, "mailbox_hash": to_mailbox_hash},
-        "date": date_time,
-        "subject": subject,
-        "attachments": attachment_list
-    }, indent=2))
-    
-    return {"status": "success", "message": "Webhook received"} 
+    # Return the status and message
+    return {"status": "success", "message": "Webhook received successfully"}
