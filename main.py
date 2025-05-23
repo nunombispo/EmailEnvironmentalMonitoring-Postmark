@@ -4,6 +4,10 @@ import uvicorn
 import database
 from contextlib import asynccontextmanager
 from utils import get_geo_info, save_email_and_attachments
+from fastapi.templating import Jinja2Templates
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
+from pathlib import Path
 
 
 @asynccontextmanager
@@ -17,6 +21,10 @@ async def lifespan(app: FastAPI):
 
 # Initialize the FastAPI app
 app = FastAPI(title="Postmark Webhook Receiver", lifespan=lifespan)
+
+# Mount templates and static files
+templates = Jinja2Templates(directory="templates")
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
 # Define the route for the webhook
@@ -84,6 +92,64 @@ async def postmark_webhook(request: Request):
     
     # Return the status and message
     return {"status": "success", "message": "Webhook received successfully"}
+
+
+@app.get("/", response_class=HTMLResponse)
+async def display_emails(request: Request):
+    """
+    Display all emails and their attachments in a web interface.
+    """
+    conn = database.get_db_connection()
+    emails = conn.execute('''
+        SELECT 
+            e.*,
+            GROUP_CONCAT(a.id) as attachment_ids,
+            GROUP_CONCAT(a.name) as attachment_names,
+            GROUP_CONCAT(a.latitude) as latitudes,
+            GROUP_CONCAT(a.longitude) as longitudes,
+            GROUP_CONCAT(a.altitude) as altitudes
+        FROM emails e
+        LEFT JOIN attachments a ON e.id = a.email_id
+        GROUP BY e.id
+        ORDER BY e.date_received DESC
+    ''').fetchall()
+    
+    # Process the concatenated values into lists
+    processed_emails = []
+    for email in emails:
+        email_dict = dict(email)
+        if email_dict['attachment_ids']:
+            email_dict['attachments'] = [
+                {
+                    'id': aid,
+                    'name': aname,
+                    'latitude': float(lat) if lat else None,
+                    'longitude': float(lon) if lon else None,
+                    'altitude': float(alt) if alt else None
+                }
+                for aid, aname, lat, lon, alt in zip(
+                    email_dict['attachment_ids'].split(','),
+                    email_dict['attachment_names'].split(','),
+                    email_dict['latitudes'].split(','),
+                    email_dict['longitudes'].split(','),
+                    email_dict['altitudes'].split(',')
+                )
+            ]
+        else:
+            email_dict['attachments'] = []
+        
+        # Remove the concatenated fields
+        for field in ['attachment_ids', 'attachment_names', 'latitudes', 'longitudes', 'altitudes']:
+            del email_dict[field]
+            
+        processed_emails.append(email_dict)
+    
+    conn.close()
+    
+    return templates.TemplateResponse(
+        "emails.html",
+        {"request": request, "emails": processed_emails}
+    )
 
 
 # Run the app

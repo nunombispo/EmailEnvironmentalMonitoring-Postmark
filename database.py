@@ -1,5 +1,7 @@
 import sqlite3
 from datetime import datetime, UTC
+import hashlib
+import time
 
 def get_db_connection():
     conn = sqlite3.connect('email_monitoring.db')
@@ -22,7 +24,8 @@ def init_db():
             subject TEXT,
             text_body TEXT,
             html_body TEXT,
-            date_received TIMESTAMP
+            date_received TIMESTAMP,
+            submission_hash TEXT UNIQUE
         )
     ''')
     
@@ -49,12 +52,17 @@ def save_email(email_data):
     conn = get_db_connection()
     c = conn.cursor()
     
+    # Generate a unique hash for the submission
+    submission_hash = hashlib.sha256(
+        f"{email_data.get('from_email')}{email_data.get('subject')}{time.time()}".encode()
+    ).hexdigest()[:12]  # Using first 12 characters for readability
+    
     # Insert email data
     c.execute('''
         INSERT INTO emails (
             from_email, from_name, to_email, to_name, to_mailbox_hash,
-            subject, text_body, html_body, date_received
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            subject, text_body, html_body, date_received, submission_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     ''', (
         email_data.get('from_email'),
         email_data.get('from_name'),
@@ -64,7 +72,8 @@ def save_email(email_data):
         email_data.get('subject'),
         email_data.get('text_body'),
         email_data.get('html_body'),
-        datetime.now(UTC)
+        datetime.now(UTC),
+        submission_hash
     ))
     
     email_id = c.lastrowid

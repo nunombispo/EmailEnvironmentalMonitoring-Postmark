@@ -62,7 +62,7 @@ def save_email_and_attachments(email_data, attachments):
         # Save image to disk
         attachment_name = attachment['name']
         attachment_content = attachment['content']
-        with open(f"attachments/{attachment_id}.{attachment_name.split('.')[-1]}", "wb") as f:
+        with open(f"static/attachments/{attachment_id}.{attachment_name.split('.')[-1]}", "wb") as f:
             f.write(attachment_content)
 
     # Return email ID
