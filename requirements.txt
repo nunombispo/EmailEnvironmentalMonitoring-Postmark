@@ -4,3 +4,4 @@ pydantic
 Pillow
 exif
 jinja2
+postmarker

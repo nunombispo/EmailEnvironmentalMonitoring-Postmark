@@ -80,7 +80,7 @@ def save_email(email_data):
     
     conn.commit()
     conn.close()
-    return email_id
+    return email_id, submission_hash
 
 def save_attachment(attachment_data):
     conn = get_db_connection()
