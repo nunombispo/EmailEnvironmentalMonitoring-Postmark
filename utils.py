@@ -14,36 +14,37 @@ def get_geo_info(image_data):
         dict - A dictionary containing the GPS information if found, otherwise None.
     """
 
-    try:            
-        # Try to get EXIF data
-        exif_image = ExifImage(image_data)
+    try:
+        from PIL import Image
+        from io import BytesIO
         
-        if not exif_image.has_exif:
+        # Open image from bytes
+        image = Image.open(BytesIO(image_data))
+        
+        # Try to get EXIF data
+        try:
+            exif_image = ExifImage(image_data)
+            if exif_image.has_exif:
+                # Get GPS info
+                if hasattr(exif_image, 'gps_latitude') and hasattr(exif_image, 'gps_longitude'):
+                    lat = exif_image.gps_latitude
+                    lon = exif_image.gps_longitude
+                    alt = exif_image.gps_altitude if hasattr(exif_image, 'gps_altitude') else None
+                    
+                    return {
+                        "latitude": lat,
+                        "longitude": lon,
+                        "altitude": alt
+                    }
+        except Exception as e:
+            print(f"Error extracting EXIF data: {str(e)}")
             return None
             
-        # Extract GPS information
-        if hasattr(exif_image, 'gps_latitude') and hasattr(exif_image, 'gps_longitude'):
-            lat = exif_image.gps_latitude
-            lon = exif_image.gps_longitude
-            
-            # Convert to decimal degrees
-            lat_decimal = lat[0] + lat[1]/60 + lat[2]/3600
-            lon_decimal = lon[0] + lon[1]/60 + lon[2]/3600
-            
-            # Adjust for South/West
-            if exif_image.gps_latitude_ref == 'S':
-                lat_decimal = -lat_decimal
-            if exif_image.gps_longitude_ref == 'W':
-                lon_decimal = -lon_decimal
-                
-            return {
-                "latitude": lat_decimal,
-                "longitude": lon_decimal,
-                "altitude": getattr(exif_image, 'gps_altitude', None)
-            }
     except Exception as e:
-        print(f"Error extracting EXIF data: {str(e)}")
+        print(f"Error processing image: {str(e)}")
         return None
+    
+    return None
 
 
 # Save email and attachments
@@ -62,7 +63,7 @@ def save_email_and_attachments(email_data, attachments):
         # Save image to disk
         attachment_name = attachment['name']
         attachment_content = attachment['content']
-        with open(f"static/attachments/{attachment_id}.{attachment_name.split('.')[-1]}", "wb") as f:
+        with open(f"static/attachments/{attachment_id}", "wb") as f:
             f.write(attachment_content)
 
     # Return email ID

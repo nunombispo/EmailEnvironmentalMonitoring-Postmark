@@ -49,7 +49,7 @@ async def postmark_webhook(request: Request):
         'from_name': data.get("FromFull", {}).get("Name"),
         'to_email': data.get("ToFull", [{}])[0].get("Email"),
         'to_name': data.get("ToFull", [{}])[0].get("Name"),
-        'to_mailbox_hash': data.get("ToFull", [{}])[0].get("MailboxHash"),
+        'to_mailbox_hash': data.get("ToFull", [{}])[0].get("MailboxHash", "low"),
         'subject': data.get("Subject"),
         'text_body': data.get("TextBody"),
         'html_body': data.get("HtmlBody")
@@ -105,9 +105,9 @@ async def display_emails(request: Request):
             e.*,
             GROUP_CONCAT(a.id) as attachment_ids,
             GROUP_CONCAT(a.name) as attachment_names,
-            GROUP_CONCAT(a.latitude) as latitudes,
-            GROUP_CONCAT(a.longitude) as longitudes,
-            GROUP_CONCAT(a.altitude) as altitudes
+            GROUP_CONCAT(COALESCE(a.latitude, '')) as latitudes,
+            GROUP_CONCAT(COALESCE(a.longitude, '')) as longitudes,
+            GROUP_CONCAT(COALESCE(a.altitude, '')) as altitudes
         FROM emails e
         LEFT JOIN attachments a ON e.id = a.email_id
         GROUP BY e.id
@@ -119,22 +119,44 @@ async def display_emails(request: Request):
     for email in emails:
         email_dict = dict(email)
         if email_dict['attachment_ids']:
-            email_dict['attachments'] = [
-                {
-                    'id': aid,
-                    'name': aname,
-                    'latitude': float(lat) if lat else None,
-                    'longitude': float(lon) if lon else None,
-                    'altitude': float(alt) if alt else None
+            # Split the concatenated values, handling NULL values
+            ids = email_dict['attachment_ids'].split(',')
+            names = email_dict['attachment_names'].split(',')
+            lats = email_dict['latitudes'].split(',') if email_dict['latitudes'] else []
+            lons = email_dict['longitudes'].split(',') if email_dict['longitudes'] else []
+            alts = email_dict['altitudes'].split(',') if email_dict['altitudes'] else []
+            
+            email_dict['attachments'] = []
+            for i in range(len(ids)):
+                attachment = {
+                    'id': ids[i],
+                    'name': names[i],
+                    'latitude': None,
+                    'longitude': None,
+                    'altitude': None,
+                    'file_name': ids[i]
                 }
-                for aid, aname, lat, lon, alt in zip(
-                    email_dict['attachment_ids'].split(','),
-                    email_dict['attachment_names'].split(','),
-                    email_dict['latitudes'].split(','),
-                    email_dict['longitudes'].split(','),
-                    email_dict['altitudes'].split(',')
-                )
-            ]
+
+                # Only add geo data if it exists and is not empty
+                if i < len(lats) and lats[i] and lats[i] != '':
+                    try:
+                        attachment['latitude'] = float(lats[i])
+                    except (ValueError, TypeError):
+                        pass
+                        
+                if i < len(lons) and lons[i] and lons[i] != '':
+                    try:
+                        attachment['longitude'] = float(lons[i])
+                    except (ValueError, TypeError):
+                        pass
+                        
+                if i < len(alts) and alts[i] and alts[i] != '':
+                    try:
+                        attachment['altitude'] = float(alts[i])
+                    except (ValueError, TypeError):
+                        pass
+                
+                email_dict['attachments'].append(attachment)
         else:
             email_dict['attachments'] = []
         

@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Email Environmental Monitoring</title>
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .card {
+            margin-bottom: 1.5rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
+        }
+        .card-header {
+            background-color: #f8f9fa;
+        }
+        .geo-info {
+            font-size: 0.9rem;
+            color: #6c757d;
+            padding: 0.75rem;
+            background-color: #f8f9fa;
+            border-top: 1px solid rgba(0,0,0,.125);
+        }
+        .attachment-image {
+            width: 100%;
+            height: 250px;
+            object-fit: cover;
+            border-radius: 0.25rem 0.25rem 0 0;
+        }
+        .priority-badge {
+            font-size: 0.8rem;
+            padding: 0.35em 0.65em;
+        }
+        .attachment-card {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        .attachment-card img {
+            flex-grow: 1;
+        }
+        .attachments-section {
+            background-color: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 0.25rem;
+            margin-top: 1.5rem;
+        }
+        .attachments-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+        }
+        .search-section {
+            background-color: #f8f9fa;
+            padding: 1.5rem;
+            border-radius: 0.25rem;
+            margin-bottom: 2rem;
+        }
+        .email-card {
+            transition: all 0.3s ease;
+        }
+        .email-card.hidden {
+            display: none;
+        }
+        .no-results {
+            text-align: center;
+            padding: 2rem;
+            color: #6c757d;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container py-4">
+        <h1 class="mb-4">Email Environmental Monitoring</h1>
+        
+        <div class="search-section">
+            <div class="row g-3">
+                <div class="col-md-8">
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search by subject, sender, or ID...">
+                </div>
+                <div class="col-md-4">
+                    <select id="priorityFilter" class="form-select">
+                        <option value="">All Priorities</option>
+                        <option value="high">High Priority</option>
+                        <option value="medium">Medium Priority</option>
+                        <option value="low">Low Priority</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="noResults" class="no-results">
+            <h4>No matching submissions found</h4>
+            <p class="text-muted">Try adjusting your search criteria</p>
+        </div>
+        
+        {% for email in emails %}
+        <div class="card email-card" 
+             data-subject="{{ email.subject|lower }}"
+             data-sender="{{ email.from_name|lower }}"
+             data-id="{{ email.submission_hash|lower }}"
+             data-priority="{{ email.to_mailbox_hash|lower }}">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <div>
+                    <h5 class="mb-0">{{ email.subject }}</h5>
+                    <small class="text-muted">ID: {{ email.submission_hash }}</small>
+                </div>
+                {% set priority = email.to_mailbox_hash|lower %}
+                {% if priority == 'high' %}
+                    <span class="badge bg-danger priority-badge">High Priority</span>
+                {% elif priority == 'medium' %}
+                    <span class="badge bg-warning text-dark priority-badge">Medium Priority</span>
+                {% elif priority == 'low' %}
+                    <span class="badge bg-info text-dark priority-badge">Low Priority</span>
+                {% else %}
+                    <span class="badge bg-secondary priority-badge">{{ email.to_mailbox_hash }}</span>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <h6 class="card-subtitle mb-2 text-muted">From: {{ email.from_name }}</h6>
+                <p class="card-text">{{ email.text_body }}</p>
+
+                {% if email.attachments %}
+                <div class="attachments-section">
+                    <h6 class="mb-3">Attachments</h6>
+                    <div class="attachments-grid">
+                        {% for attachment in email.attachments %}
+                        <div class="attachment-card">
+                            <img src="/static/attachments/{{ attachment.file_name }}" 
+                                 class="attachment-image" alt="{{ attachment.name }}">
+                            {% if attachment.latitude and attachment.longitude %}
+                            <div class="geo-info">
+                                <p class="mb-0">
+                                    <strong>Location:</strong><br>
+                                    Lat: {{ "%.6f"|format(attachment.latitude) }}<br>
+                                    Long: {{ "%.6f"|format(attachment.longitude) }}
+                                    {% if attachment.altitude %}
+                                    <br>Alt: {{ "%.2f"|format(attachment.altitude) }}m
+                                    {% endif %}
+                                </p>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+            <div class="card-footer text-muted">
+                Received: {{ email.date_received }}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Bootstrap 5 JS Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const searchInput = document.getElementById('searchInput');
+            const priorityFilter = document.getElementById('priorityFilter');
+            const emailCards = document.querySelectorAll('.email-card');
+            const noResults = document.getElementById('noResults');
+
+            function filterEmails() {
+                const searchTerm = searchInput.value.toLowerCase();
+                const priorityValue = priorityFilter.value.toLowerCase();
+                let visibleCount = 0;
+
+                emailCards.forEach(card => {
+                    const subject = card.dataset.subject;
+                    const sender = card.dataset.sender;
+                    const id = card.dataset.id;
+                    const priority = card.dataset.priority;
+
+                    const matchesSearch = searchTerm === '' || 
+                        subject.includes(searchTerm) || 
+                        sender.includes(searchTerm) || 
+                        id.includes(searchTerm);
+
+                    const matchesPriority = priorityValue === '' || 
+                        (priorityValue === 'high' && priority === 'high') ||
+                        (priorityValue === 'medium' && priority === 'medium') ||
+                        (priorityValue === 'low' && priority === 'low');
+
+                    if (matchesSearch && matchesPriority) {
+                        card.classList.remove('hidden');
+                        visibleCount++;
+                    } else {
+                        card.classList.add('hidden');
+                    }
+                });
+
+                noResults.style.display = visibleCount === 0 ? 'block' : 'none';
+            }
+
+            searchInput.addEventListener('input', filterEmails);
+            priorityFilter.addEventListener('change', filterEmails);
+        });
+    </script>
+</body>
+</html> 
