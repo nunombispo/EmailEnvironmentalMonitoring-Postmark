@@ -1,61 +1,22 @@
 import base64
 from fastapi import FastAPI, Request
-import json
-from PIL import Image
-from exif import Image as ExifImage
-import io
-from typing import Optional, Dict, Any
+import uvicorn
+import database
+from contextlib import asynccontextmanager
+from utils import get_geo_info, save_email_and_attachments
 
 
-
-def get_geo_info(image_data: bytes) -> Optional[Dict[str, Any]]:
-    """
-    Extracts GPS information from an image.
-    
-    Args:
-        image_data: bytes - The image data to extract GPS information from.
-        
-    Returns:	
-        dict - A dictionary containing the GPS information if found, otherwise None.
-    """
-
-    try:
-        # Create an in-memory file-like object
-        image_stream = io.BytesIO(image_data)
-        
-        # Try to get EXIF data
-        exif_image = ExifImage(image_stream)
-        
-        if not exif_image.has_exif:
-            return None
-            
-        # Extract GPS information
-        if hasattr(exif_image, 'gps_latitude') and hasattr(exif_image, 'gps_longitude'):
-            lat = exif_image.gps_latitude
-            lon = exif_image.gps_longitude
-            
-            # Convert to decimal degrees
-            lat_decimal = lat[0] + lat[1]/60 + lat[2]/3600
-            lon_decimal = lon[0] + lon[1]/60 + lon[2]/3600
-            
-            # Adjust for South/West
-            if exif_image.gps_latitude_ref == 'S':
-                lat_decimal = -lat_decimal
-            if exif_image.gps_longitude_ref == 'W':
-                lon_decimal = -lon_decimal
-                
-            return {
-                "latitude": lat_decimal,
-                "longitude": lon_decimal,
-                "altitude": getattr(exif_image, 'gps_altitude', None)
-            }
-    except Exception as e:
-        print(f"Error extracting EXIF data: {str(e)}")
-        return None
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup
+    database.init_db()
+    yield
+    # Shutdown
+    pass
 
 
 # Initialize the FastAPI app
-app = FastAPI(title="Postmark Webhook Receiver")
+app = FastAPI(title="Postmark Webhook Receiver", lifespan=lifespan)
 
 
 # Define the route for the webhook
@@ -74,30 +35,21 @@ async def postmark_webhook(request: Request):
     # Get the raw JSON data from the request
     data = await request.json()
     
-    # Get the From information
-    from_email = data.get("FromFull").get("Email")
-    from_name = data.get("FromFull").get("Name")
+    # Prepare email data
+    email_data = {
+        'from_email': data.get("FromFull", {}).get("Email"),
+        'from_name': data.get("FromFull", {}).get("Name"),
+        'to_email': data.get("ToFull", [{}])[0].get("Email"),
+        'to_name': data.get("ToFull", [{}])[0].get("Name"),
+        'to_mailbox_hash': data.get("ToFull", [{}])[0].get("MailboxHash"),
+        'subject': data.get("Subject"),
+        'text_body': data.get("TextBody"),
+        'html_body': data.get("HtmlBody")
+    }
     
-    # Get the To information
-    to_email = data.get("ToFull")[0].get("Email")
-    to_name = data.get("ToFull")[0].get("Name")
-    to_mailbox_hash = data.get("ToFull")[0].get("MailboxHash")
-    
-    # Get the date and time of the email
-    date_time = data.get("Date")
-    
-    # Get the subject of the email
-    subject = data.get("Subject")
-    
-    # Get the text body of the email
-    text_body = data.get("TextBody")
-    
-    # Get the HTML body of the email
-    html_body = data.get("HtmlBody")
-    
-    # Get the attachments
+    # Process attachments
     attachments = data.get("Attachments", [])
-    attachment_list = []
+    attachments_data = []
     for attachment in attachments:
         # Get the attachment info
         attachment_name = attachment.get("Name")
@@ -113,17 +65,27 @@ async def postmark_webhook(request: Request):
         if attachment_content_type.startswith('image/'):
             geo_info = get_geo_info(decoded_content)
         
-        # Create the attachment info
-        attachment_info = {
-            "name": attachment_name,
-            "content_type": attachment_content_type,
-            "content_length": attachment_content_length,
-            "decoded_content": decoded_content,
-            "geo_info": geo_info
+        # Prepare attachment data
+        attachment_data = {
+            'name': attachment_name,
+            'content_type': attachment_content_type,
+            'content_length': attachment_content_length,
+            'content': decoded_content,
+            'latitude': geo_info.get("latitude") if geo_info else None,
+            'longitude': geo_info.get("longitude") if geo_info else None,
+            'altitude': geo_info.get("altitude") if geo_info else None
         }
-        
-        # Append the attachment info to the list
-        attachment_list.append(attachment_info)
+
+        # Add email_id to attachment
+        attachments_data.append(attachment_data)
+
+    # Save email and attachments
+    save_email_and_attachments(email_data, attachments_data)
     
     # Return the status and message
     return {"status": "success", "message": "Webhook received successfully"}
+
+
+# Run the app
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
