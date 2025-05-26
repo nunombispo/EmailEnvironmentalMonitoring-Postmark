@@ -134,7 +134,6 @@ def save_email_and_attachments(email_data, attachments):
         attachment_id = database.save_attachment(attachment)
 
         # Save image to disk
-        attachment_name = attachment['name']
         attachment_content = attachment['content']
         with open(f"static/attachments/{attachment_id}", "wb") as f:
             f.write(attachment_content)

@@ -54,6 +54,10 @@ async def postmark_webhook(request: Request):
         'text_body': data.get("TextBody"),
         'html_body': data.get("HtmlBody")
     }
+
+    # If the to_mailbox_hash is empty, set it to "low"
+    if email_data.get("to_mailbox_hash") == "":
+        email_data["to_mailbox_hash"] = "low"
     
     # Process attachments
     attachments = data.get("Attachments", [])
