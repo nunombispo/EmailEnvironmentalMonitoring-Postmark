@@ -7,7 +7,6 @@ from utils import get_geo_info, save_email_and_attachments
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse
-from pathlib import Path
 
 
 @asynccontextmanager
