@@ -99,6 +99,8 @@ def send_confirmation_email(email_data, submission_hash):
         We have received your environmental monitoring submission with ID: {submission_hash}
         
         Your data has been successfully processed and stored in our system.
+
+        You can view your submission at: https://email-environment-monitoring.developer-service.io/
         
         ---
         This is an automated response. Please do not reply to this email.
