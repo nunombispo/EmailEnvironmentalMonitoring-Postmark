@@ -1,6 +1,8 @@
 # Email Environmental Monitoring System
 
-A FastAPI application that receives and processes environmental monitoring data via email, powered by Postmark's inbound email parsing. The system automatically processes submissions, extracts geolocation data from images, and sends confirmation emails to submitters.
+A FastAPI application that receives and processes environmental monitoring data via email, powered by Postmark's inbound email parsing.
+
+The system automatically processes submissions, extracts geolocation data from images, and sends confirmation emails to submitters.
 
 ## 🌟 Features
 
@@ -66,11 +68,11 @@ uvicorn main:app --reload
 
 The server will start at `http://localhost:8000`
 
-💡 You can expose your local server to Postmark using ngrok:
+💡 You can expose your local server to the Internet and Postmark using ngrok:
 
 `ngrok http 8000`
 
-Copy the URL (e.g. https://xxxxxx.ngrok-free.app/webhook) and configure it as your Postmark inbound webhook URL.
+Prepare the ngrok URL with the endpoint of the webhook (e.g. https://xxxxxx.ngrok-free.app/webhook) and configure it as your Postmark inbound webhook URL.
 
 ## 📧 Making Submissions
 
@@ -95,36 +97,6 @@ Access the web interface at `http://localhost:8000` (or the ngrok URL) to:
 - See images with their geolocation data
 - Search submissions by subject, sender, or ID
 - Filter by priority level
-
-## 📝 Database Schema
-
-The application uses SQLite with two main tables:
-
-### Emails Table
-
-- `id`: Primary key
-- `from_email`: Sender's email
-- `from_name`: Sender's name
-- `to_email`: Recipient email
-- `to_name`: Recipient name
-- `to_mailbox_hash`: Priority level
-- `subject`: Email subject
-- `text_body`: Plain text content
-- `html_body`: HTML content
-- `date_received`: Timestamp
-- `submission_hash`: Unique identifier
-
-### Attachments Table
-
-- `id`: Primary key
-- `email_id`: Foreign key to emails
-- `name`: Original filename
-- `content_type`: MIME type
-- `content_length`: File size
-- `content`: Binary data
-- `latitude`: GPS latitude
-- `longitude`: GPS longitude
-- `altitude`: GPS altitude
 
 ## 🤝 Contributing
 
