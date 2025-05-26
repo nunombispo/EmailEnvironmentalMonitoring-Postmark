@@ -86,6 +86,7 @@ def send_confirmation_email(email_data, submission_hash):
                 <h2>Thank you for your submission!</h2>
                 <p>We have received your environmental monitoring submission with ID: <strong>{submission_hash}</strong></p>
                 <p>Your data has been successfully processed and stored in our system.</p>
+                <p>You can view your submission at: https://email-environment-monitoring.developer-service.io/</p>
                 <hr>
                 <p><small>This is an automated response. Please do not reply to this email.</small></p>
             </body>
