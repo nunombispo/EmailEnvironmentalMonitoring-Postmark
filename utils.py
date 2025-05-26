@@ -109,7 +109,7 @@ def send_confirmation_email(email_data, submission_hash):
         
         # Send email using Postmark
         postmark.emails.send(
-            From='developer@developer-service.io',
+            From=os.getenv('POSTMARK_FROM_EMAIL'),
             To=email_data['from_email'],
             Subject=subject,
             HtmlBody=html_body,
